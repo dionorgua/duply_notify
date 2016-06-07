@@ -10,3 +10,5 @@ verbose = False
 
 notification_app_name = 'duply'
 notification_icon = 'ark'
+
+save_duply_log_file_name = None

@@ -82,6 +82,10 @@ USAGE
                             help='application name for notification (default: duply)')
         parser.add_argument('-i', '--icon', action='store', default='ark', help='notification icon (default: ark)')
 
+        # debug
+        parser.add_argument('--debug-log', dest='debug_log', action='store', default=None,
+                            help='save duplicity machine-readable log to file')
+
         parser.add_argument('cmd', nargs='+', action='store', help='duplicity/duply command line')
 
         # Process arguments
@@ -99,6 +103,7 @@ USAGE
 
         globals.notification_app_name = args.name
         globals.notification_icon = args.icon
+        globals.save_duply_log_file_name = args.debug_log
 
         return run_me(args.cmd)
 

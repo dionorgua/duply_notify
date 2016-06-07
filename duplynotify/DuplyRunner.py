@@ -11,6 +11,7 @@ import time
 import os
 from dbus.exceptions import DBusException
 
+from duplynotify import globals
 from duplynotify.JobViewClient import JobViewClient
 
 
@@ -25,6 +26,7 @@ class DuplyRunner(object):
         self.app_name = app_name
         self.icon = icon
         self.job = None
+        self.debug_log_fd = None
 
         self.processed_handler = None
 
@@ -59,7 +61,14 @@ class DuplyRunner(object):
 
     def run_internal(self, runner):
         self.check_setup_job()
-        res = runner()
+        try:
+            if globals.save_duply_log_file_name:
+                self.debug_log_fd = open(globals.save_duply_log_file_name, 'w')
+            res = runner()
+        finally:
+            if self.debug_log_fd:
+                self.debug_log_fd.close()
+
         self.cleanup_job()
         return res
 
@@ -127,6 +136,8 @@ class DuplyRunner(object):
                 break
             if line:
                 line = line.strip()
+                if self.debug_log_fd:
+                    self.debug_log_fd.write(line+'\n')
                 if self.parse_line(line) and self.processed_handler:
                     self.processed_handler(line)
 

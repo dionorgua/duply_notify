@@ -44,6 +44,8 @@ class CLIError(Exception):
 
 def run_me(cmd):
     runner = DuplyRunner(cmd, globals.notification_app_name, globals.notification_icon)
+    if globals.replay_log_file_name:
+        return runner.run_fake(globals.replay_log_file_name)
     return runner.run()
 
 
@@ -85,15 +87,17 @@ USAGE
         # debug
         parser.add_argument('--debug-log', dest='debug_log', action='store', default=None,
                             help='save duplicity machine-readable log to file')
+        parser.add_argument('--replay-log', dest='replay_log', action='store', default=None,
+                            help='parse provided log file instead of running duplicity')
 
-        parser.add_argument('cmd', nargs='+', action='store', help='duplicity/duply command line')
+        parser.add_argument('cmd', nargs='*', action='store', help='duplicity/duply command line')
 
         # Process arguments
         args = parser.parse_args()
 
         verbose = args.verbose
 
-        if len(args.cmd) == 0:
+        if len(args.cmd) == 0 and not args.replay_log:
             parser.print_usage()
             return 1
 
@@ -104,6 +108,7 @@ USAGE
         globals.notification_app_name = args.name
         globals.notification_icon = args.icon
         globals.save_duply_log_file_name = args.debug_log
+        globals.replay_log_file_name = args.replay_log
 
         return run_me(args.cmd)
 

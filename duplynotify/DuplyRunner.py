@@ -33,7 +33,7 @@ class DuplyRunner(object):
         self.backup_name = None
         self.backup_main_action = None
         self.is_estimate_done = False
-        self.last_info_message = None
+        self.last_info_message = "backup"
         self.last_file_name = None
         self.last_file_name_rate_dict = {}
         self.last_volume_name = None

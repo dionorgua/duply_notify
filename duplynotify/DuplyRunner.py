@@ -31,17 +31,23 @@ class DuplyRunner(object):
         self.processed_handler = None
 
         self.backup_name = None
-        self.estimate_done = False
+        self.backup_main_action = None
+        self.is_estimate_done = False
         self.last_info_message = None
+        self.last_file_name = None
+        self.last_file_name_rate_dict = {}
         self.last_volume_name = None
         self.last_status = None
+        self.is_uploading = False
+        self.is_adding_files = False
 
         self.RE_PATTERNS = [
             (re.compile(r'Using backup name: (.*)$'), self.re_backup_name),
+            (re.compile(r'Main action: (.*)$'), self.re_main_action),
             ('Synchronizing remote metadata to local cache...', self.re_print_line),
             (re.compile(r'Copying (.*) to local cache.'), self.re_copy_to_local),
             ('Collection Status', self.re_handle_collection_status),
-            # (re.compile('Reading globbing filelist: .*'), self.re_handle_globbing),
+            (re.compile(r'AsyncScheduler: instantiating at concurrency.*$'), self.re_handle_startup),
             (re.compile(r'Writing (.*\.gpg)$'), self.re_write_gpg),
             ('Create Par2 recovery files', self.re_par2),
         ]
@@ -50,6 +56,9 @@ class DuplyRunner(object):
             (re.compile(r'NOTICE 16 (?P<changed_bytes>\d+) (?P<elapsed>\d+) '
                         '(?P<progress>\d+) (?P<eta>\d+) (?P<speed>\d+) (?P<stalled>\d+)'),
              self.re_progress),
+            (re.compile(r'INFO (4|5|6) \'(?P<file_name>.*)\''), self.re_diff_file),
+            (re.compile(r'INFO (11|12)'), self.re_upload_begin),
+            (re.compile(r'INFO (13|14)'), self.re_upload_done),
         ]
 
     def run(self):
@@ -79,14 +88,14 @@ class DuplyRunner(object):
             if not self.job.is_ready():
                 self.job.start(self.app_name, self.icon, 0)
 
-            if self.last_info_message:
-                self.set_info_message(self.last_info_message)
+                if self.last_info_message:
+                    self.set_info_message(self.last_info_message)
 
-            if self.last_status:
-                self.set_status(self.last_status)
+                if self.last_status:
+                    self.set_status(self.last_status)
 
-            if self.last_volume_name:
-                self.set_volume_name(self.last_volume_name)
+                if self.last_file_name:
+                    self.set_file_name(self.last_file_name)
 
         except DBusException as e:
             print("DuplyRunner: %s" % e)
@@ -127,6 +136,10 @@ class DuplyRunner(object):
             # noinspection PyTypeChecker
             res = self.process_with_fd(None, fd)
             return res
+        except KeyboardInterrupt:
+            print("Keyboard interrupt!!!")
+            self.cleanup_job()
+            raise
         finally:
             fd.close()
 
@@ -139,6 +152,10 @@ class DuplyRunner(object):
                 line = line.strip()
                 if self.debug_log_fd:
                     self.debug_log_fd.write('[%10.6f] %s\n' % (time.time(), line))
+
+                if globals.verbose:
+                    print(line)
+
                 if self.parse_line(line) and self.processed_handler:
                     self.processed_handler(line)
 
@@ -192,43 +209,73 @@ class DuplyRunner(object):
         self.last_info_message = msg
         self.job.set_info_message(msg)
 
+    def update_info_message(self):
+        res = 'duply'
+        if self.backup_name is not None:
+            res = self.backup_name
+        if self.backup_main_action is not None:
+            res += " (%s)" % self.backup_main_action
+        self.set_info_message(res)
+
     def set_status(self, msg):
         self.last_status = msg
         self.job.set_description_field(0, 'status', msg)
 
-    def set_volume_name(self, volume_name):
-        self.last_volume_name = volume_name
-        self.job.set_description_field(1, 'volume', volume_name)
+    def set_file_name(self, file_name, rate_limit_key=None):
+        self.last_file_name = file_name
+
+        if rate_limit_key is not None:
+            prev_time = self.last_file_name_rate_dict.get(rate_limit_key, 0)
+            new_time = time.time()
+            if new_time - prev_time < 2.0:
+                return
+
+            self.last_file_name_rate_dict[rate_limit_key] = new_time
+
+        self.job.set_description_field(1, 'file', file_name)
 
     def re_print_line(self, match):
         self.set_status(match)
 
     def re_backup_name(self, match):
         self.backup_name = match.group(1)
-        self.set_info_message("duply: %s" % self.backup_name)
+        self.update_info_message()
+
+    def re_main_action(self, match):
+        self.backup_main_action = match.group(1)
+        self.update_info_message()
 
     def re_copy_to_local(self, match):
         vol = match.group(1)
-        self.set_volume_name(vol)
+        self.set_file_name(vol)
 
     # noinspection PyUnusedLocal
     def re_handle_collection_status(self, match):
-        self.set_volume_name('')
+        self.set_file_name('')
         self.set_status('Calculating changes')
 
-    # noinspection PyUnusedLocal
-    def re_handle_globbing(self, match):
-        if not self.estimate_done:
-            self.estimate_done = True
-            self.set_status('starting backup')
+    def re_handle_startup(self, _):
+        if not self.is_estimate_done:
+            self.is_estimate_done = True
+            self.is_adding_files = False
+            self.set_status('Backup in progress')
+            time.sleep(10)
+
+    def mark_estimate_done(self):
+        self.is_uploading = False
+        self.is_estimate_done = True
 
     def re_write_gpg(self, match):
-        vol_name = match.group(1)
-        self.set_volume_name(vol_name)
-        self.set_status("gpg: %s" % vol_name)
+        self.mark_estimate_done()
+        self.is_adding_files = False
+        self.last_volume_name = match.group(1)
+        self.set_file_name(self.last_volume_name)
+        self.set_status("gpg: %s" % self.last_volume_name)
 
     # noinspection PyUnusedLocal
     def re_par2(self, match):
+        self.mark_estimate_done()
+        self.is_adding_files = False
         self.set_status('par2: %s' % self.last_volume_name)
 
     def re_progress(self, match):
@@ -242,8 +289,26 @@ class DuplyRunner(object):
             speed = 0
 
         changed_value, changed_unit = self.format_size(changed_bytes)
-        self.set_status('uploading: %d %s' % (changed_value, changed_unit))
+
+        if self.is_uploading:
+            self.set_status('uploading: %d %s' % (changed_value, changed_unit))
 
         self.job.set_percent(progress)
         self.job.set_speed(speed)
         self.job.set_processed_amount(changed_value, changed_unit)
+
+    def re_diff_file(self, match):
+        file_name = match.group('file_name')
+        self.set_file_name(file_name, rate_limit_key='diff_file')
+        if not self.is_adding_files:
+            self.is_adding_files = True
+            if self.is_estimate_done:
+                self.set_status("scanning/adding files")
+
+    def re_upload_begin(self, _):
+        self.mark_estimate_done()
+        self.is_uploading = True
+        self.is_adding_files = False
+
+    def re_upload_done(self, _):
+        self.is_uploading = False

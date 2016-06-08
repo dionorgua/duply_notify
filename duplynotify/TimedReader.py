@@ -35,7 +35,10 @@ class TimedReader(object):
         # sleep a bit if needed
         if self.prev_time is not None:
             delta = msg_time - self.prev_time
-            time.sleep(delta / globals.replay_log_speed)
+            sleep_time = delta / globals.replay_log_speed
+            if sleep_time > 1 or sleep_time < 0:
+                sleep_time = 1.0
+            time.sleep(sleep_time)
 
         self.prev_time = msg_time
 

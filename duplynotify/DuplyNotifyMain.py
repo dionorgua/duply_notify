@@ -89,6 +89,8 @@ USAGE
                             help='save duplicity machine-readable log to file')
         parser.add_argument('--replay-log', dest='replay_log', action='store', default=None,
                             help='parse provided log file instead of running duplicity')
+        parser.add_argument('--replay-speed', type=float, dest='replay_speed', action='store', default=1.0,
+                            help='replay speed (2 will replay 2 times faster)')
 
         parser.add_argument('cmd', nargs='*', action='store', help='duplicity/duply command line')
 
@@ -109,6 +111,7 @@ USAGE
         globals.notification_icon = args.icon
         globals.save_duply_log_file_name = args.debug_log
         globals.replay_log_file_name = args.replay_log
+        globals.replay_log_speed = args.replay_speed
 
         return run_me(args.cmd)
 

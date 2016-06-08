@@ -13,11 +13,11 @@ from dbus.exceptions import DBusException
 
 from duplynotify import globals
 from duplynotify.JobViewClient import JobViewClient
+from duplynotify.TimedReader import TimedReader
 
 
 def print_sleep(msg):
     print('==> %s' % msg)
-    time.sleep(0.1)
 
 
 class DuplyRunner(object):
@@ -123,6 +123,7 @@ class DuplyRunner(object):
     def process_fake(self, captured_logfile):
         fd = open(captured_logfile, 'r')
         try:
+            fd = TimedReader(fd)
             # noinspection PyTypeChecker
             res = self.process_with_fd(None, fd)
             return res
@@ -137,7 +138,7 @@ class DuplyRunner(object):
             if line:
                 line = line.strip()
                 if self.debug_log_fd:
-                    self.debug_log_fd.write(line+'\n')
+                    self.debug_log_fd.write('[%10.6f] %s\n' % (time.time(), line))
                 if self.parse_line(line) and self.processed_handler:
                     self.processed_handler(line)
 

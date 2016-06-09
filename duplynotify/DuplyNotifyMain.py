@@ -18,6 +18,7 @@ import os
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
 from duplynotify.DuplyRunner import DuplyRunner
+from duplynotify.JobViewClient import JobViewClient
 from duplynotify import globals
 
 __all__ = []
@@ -40,6 +41,17 @@ class CLIError(Exception):
 
     def __unicode__(self):
         return self.msg
+
+
+def test_dbus():
+    client = JobViewClient()
+    msg = 'Press Enter to exit'
+    client.start(globals.notification_app_name, globals.notification_icon, 0)
+    client.set_info_message("duply_notify test")
+    client.set_description_field(0, 'test', msg)
+    print(msg)
+    sys.stdin.readline()
+    client.stop()
 
 
 def run_me(cmd):
@@ -87,6 +99,8 @@ USAGE
         parser.add_argument('-i', '--icon', action='store', default='ark', help='notification icon (default: ark)')
 
         # debug
+        parser.add_argument('--test-dbus', dest='test_dbus', action='store_true',
+                            help="just try to show notification without backup. Useful for dbus testing")
         parser.add_argument('--debug-log', dest='debug_log', action='store', default=None,
                             help='save duplicity machine-readable log to file')
         parser.add_argument('--replay-log', dest='replay_log', action='store', default=None,
@@ -101,7 +115,7 @@ USAGE
 
         verbose = args.verbose
 
-        if len(args.cmd) == 0 and not args.replay_log:
+        if len(args.cmd) == 0 and not args.replay_log and not args.test_dbus:
             parser.print_usage()
             return 1
 
@@ -115,6 +129,9 @@ USAGE
         globals.save_duply_log_file_name = args.debug_log
         globals.replay_log_file_name = args.replay_log
         globals.replay_log_speed = args.replay_speed
+
+        if args.test_dbus:
+            return test_dbus()
 
         return run_me(args.cmd)
 

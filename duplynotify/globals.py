@@ -17,3 +17,7 @@ save_duply_log_file_name = None
 # log file to replay instead of running duplicity
 replay_log_file_name = None
 replay_log_speed = 2.0
+
+# dbus
+dbus_user = None
+dbus_env = None

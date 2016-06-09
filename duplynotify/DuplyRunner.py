@@ -12,6 +12,7 @@ import os
 from dbus.exceptions import DBusException
 
 from duplynotify import globals
+from duplynotify.DBusEnv import dbus_update_environment
 from duplynotify.JobViewClient import JobViewClient
 from duplynotify.TimedReader import TimedReader
 
@@ -86,6 +87,7 @@ class DuplyRunner(object):
             if not self.job:
                 self.job = JobViewClient()
             if not self.job.is_ready():
+                dbus_update_environment()
                 self.job.start(self.app_name, self.icon, 0)
 
                 if self.last_info_message:

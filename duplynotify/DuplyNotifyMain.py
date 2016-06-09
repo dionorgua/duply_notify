@@ -11,12 +11,14 @@ duply_notify is a duplicity wrapper that shows progress in KDE notification area
 
 @contact:    dion@dion.org.ua
 """
-
+import logging
 import sys
 import os
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
+
+from duplynotify.DBusEnv import dbus_update_environment
 from duplynotify.DuplyRunner import DuplyRunner
 from duplynotify.JobViewClient import JobViewClient
 from duplynotify import globals
@@ -44,6 +46,7 @@ class CLIError(Exception):
 
 
 def test_dbus():
+    dbus_update_environment()
     client = JobViewClient()
     msg = 'Press Enter to exit'
     client.start(globals.notification_app_name, globals.notification_icon, 0)
@@ -89,24 +92,38 @@ USAGE
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
 
-        parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="set verbosity")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
 
-        parser.add_argument('-t', '--title', action='store', default=None,
-                            help='notification title (useful for duply with pre-backup script')
-        parser.add_argument('-n', '--name', action='store', default='duply',
-                            help='application name for notification (default: duply)')
-        parser.add_argument('-i', '--icon', action='store', default='ark', help='notification icon (default: ark)')
+        # notification itself
+        icon_opts = parser.add_argument_group('notification', 'notification look')
+
+        icon_opts.add_argument('-t', '--title', action='store', default=None,
+                               help='notification title (useful for duply with pre-backup script')
+        icon_opts.add_argument('-n', '--name', action='store', default='duply',
+                               help='application name for notification (default: duply)')
+        icon_opts.add_argument('-i', '--icon', action='store', default='ark', help='notification icon (default: ark)')
+
+        # dbus stuff
+        dbus_opts = parser.add_argument_group('dbus', 'how to connect to DBus daemon')
+        dbus_excl = dbus_opts.add_mutually_exclusive_group()
+        dbus_excl.add_argument('--dbus-env', dest='dbus_env', action='store',
+                               help='file to read dbus environment variables'
+                                    ' (if current session has no DBUS_SESSION_BUS_ADDRESS).')
+        dbus_excl.add_argument('--dbus-user', dest='dbus_user', action='store',
+                               help='guess environment for user (from /home/$USER/.dbus/session-bus)')
+        dbus_opts.add_argument('--test-dbus', dest='test_dbus', action='store_true',
+                               help="just try to show notification without backup. Useful for dbus testing")
 
         # debug
-        parser.add_argument('--test-dbus', dest='test_dbus', action='store_true',
-                            help="just try to show notification without backup. Useful for dbus testing")
-        parser.add_argument('--debug-log', dest='debug_log', action='store', default=None,
-                            help='save duplicity machine-readable log to file')
-        parser.add_argument('--replay-log', dest='replay_log', action='store', default=None,
-                            help='parse provided log file instead of running duplicity')
-        parser.add_argument('--replay-speed', type=float, dest='replay_speed', action='store', default=1.0,
-                            help='replay speed (2 will replay 2 times faster)')
+        debug_opts = parser.add_argument_group('debug', 'debugging stuff')
+        debug_opts.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="set verbosity")
+
+        debug_opts.add_argument('--debug-log', dest='debug_log', action='store', default=None,
+                                help='save duplicity machine-readable log to file')
+        debug_opts.add_argument('--replay-log', dest='replay_log', action='store', default=None,
+                                help='parse provided log file instead of running duplicity')
+        debug_opts.add_argument('--replay-speed', type=float, dest='replay_speed', action='store', default=1.0,
+                                help='replay speed (2 will replay 2 times faster)')
 
         parser.add_argument('cmd', nargs='*', action='store', help='duplicity/duply command line')
 
@@ -122,10 +139,15 @@ USAGE
         if verbose:
             print("Verbose mode on")
             globals.verbose = True
+            logging.basicConfig(level=logging.DEBUG)
 
         globals.notification_title = args.title
         globals.notification_app_name = args.name
         globals.notification_icon = args.icon
+
+        globals.dbus_user = args.dbus_user
+        globals.dbus_env = args.dbus_env
+
         globals.save_duply_log_file_name = args.debug_log
         globals.replay_log_file_name = args.replay_log
         globals.replay_log_speed = args.replay_speed
@@ -138,7 +160,7 @@ USAGE
     except KeyboardInterrupt:
         return 1
     except Exception as e:
-        if DEBUG:
+        if DEBUG or globals.verbose:
             raise
         indent = len(program_name) * " "
         sys.stderr.write(program_name + ": " + repr(e) + "\n")

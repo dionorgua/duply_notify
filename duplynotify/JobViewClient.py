@@ -15,10 +15,12 @@ class JobViewClient(object):
 
     def __init__(self):
         self.id = None
-        self.session_bus = dbus.SessionBus()
+        self.session_bus = None
         self.job_iface = None
 
     def start(self, app_name, app_icon, capabilities):
+        self.session_bus = dbus.SessionBus()
+
         server = self.session_bus.get_object('org.kde.JobViewServer', '/JobViewServer')
         iface = dbus.Interface(server, 'org.kde.JobViewServer')
         res = iface.requestView(app_name, app_icon, capabilities)

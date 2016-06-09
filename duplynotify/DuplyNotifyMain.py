@@ -111,7 +111,7 @@ USAGE
                                     ' (if current session has no DBUS_SESSION_BUS_ADDRESS).')
         dbus_excl.add_argument('--dbus-user', dest='dbus_user', action='store',
                                help='guess environment for user (from /home/$USER/.dbus/session-bus)')
-        dbus_opts.add_argument('--test-dbus', dest='test_dbus', action='store_true',
+        dbus_opts.add_argument('--dbus-test', '--test-dbus', dest='test_dbus', action='store_true',
                                help="just try to show notification without backup. Useful for dbus testing")
 
         # debug

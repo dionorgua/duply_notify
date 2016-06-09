@@ -80,6 +80,8 @@ USAGE
         parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="set verbosity")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
 
+        parser.add_argument('-t', '--title', action='store', default=None,
+                            help='notification title (useful for duply with pre-backup script')
         parser.add_argument('-n', '--name', action='store', default='duply',
                             help='application name for notification (default: duply)')
         parser.add_argument('-i', '--icon', action='store', default='ark', help='notification icon (default: ark)')
@@ -107,6 +109,7 @@ USAGE
             print("Verbose mode on")
             globals.verbose = True
 
+        globals.notification_title = args.title
         globals.notification_app_name = args.name
         globals.notification_icon = args.icon
         globals.save_duply_log_file_name = args.debug_log

@@ -33,7 +33,7 @@ class DuplyRunner(object):
         self.backup_name = None
         self.backup_main_action = None
         self.is_estimate_done = False
-        self.last_info_message = "backup"
+        self.last_info_message = None
         self.last_file_name = None
         self.last_file_name_rate_dict = {}
         self.last_volume_name = None
@@ -90,6 +90,8 @@ class DuplyRunner(object):
 
                 if self.last_info_message:
                     self.set_info_message(self.last_info_message)
+                else:
+                    self.update_info_message()
 
                 if self.last_status:
                     self.set_status(self.last_status)
@@ -210,9 +212,11 @@ class DuplyRunner(object):
         self.job.set_info_message(msg)
 
     def update_info_message(self):
-        res = 'duply'
-        if self.backup_name is not None:
+        res = globals.notification_title
+        if res is None and self.backup_name is not None:
             res = self.backup_name
+        if res is None:
+            res = 'backup'
         if self.backup_main_action is not None:
             res += " (%s)" % self.backup_main_action
         self.set_info_message(res)

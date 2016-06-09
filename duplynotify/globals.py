@@ -8,6 +8,7 @@ License: GPLv2+
 
 verbose = False
 
+notification_title = None
 notification_app_name = 'duply'
 notification_icon = 'ark'
 
